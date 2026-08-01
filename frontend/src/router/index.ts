@@ -13,6 +13,7 @@ const router = createRouter({
     {
       path: '/',
       component: MainLayout,
+      meta: { requiresAuth: true },
       children: [
         {
           path: '',
@@ -20,9 +21,24 @@ const router = createRouter({
           component: Feed
         },
         {
-          path: 'profile/:id?',
-          name: 'profile',
+          path: 'profile',
+          name: 'my-profile',
           component: Profile
+        },
+        {
+          path: 'profile/:id',
+          name: 'user-profile',
+          component: Profile
+        },
+        {
+          path: 'notifications',
+          name: 'notifications',
+          component: () => import('../views/Notifications.vue')
+        },
+        {
+          path: 'search',
+          name: 'search',
+          component: () => import('../views/Explore.vue')
         },
         {
           path: 'settings',
@@ -52,16 +68,17 @@ const router = createRouter({
 
 // Navigation guard sederhana
 router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('token');
+  const tokenString = localStorage.getItem('token');
+  const hasToken = tokenString && tokenString !== 'undefined' && tokenString !== 'null';
   
   if (to.name === 'login' || to.name === 'register') {
-    if (token) {
+    if (hasToken) {
       next({ name: 'feed' });
     } else {
       next();
     }
   } else {
-    if (!token && to.name !== 'login' && to.name !== 'register') {
+    if (!hasToken && to.name !== 'login' && to.name !== 'register') {
       next({ name: 'login' });
     } else {
       next();

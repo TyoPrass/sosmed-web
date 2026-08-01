@@ -22,6 +22,10 @@
            <img src="../assets/icon/notification.png" alt="Notifications" />
            Notifications
         </a>
+        <a href="#" class="nav-item logout-btn" @click.prevent="handleLogout">
+           <img src="../assets/icon/logout.png" alt="Logout" />
+           Logout
+        </a>
       </div>
 
       <!-- Settings Content -->
@@ -148,6 +152,17 @@ const saveSettings = async () => {
   }
 };
 
+const handleLogout = async () => {
+  try {
+    await api.post('/logout');
+  } catch (e) {
+    // ignore error
+  } finally {
+    localStorage.removeItem('token');
+    router.push('/auth/login');
+  }
+};
+
 onMounted(() => {
   fetchProfile();
 });
@@ -206,6 +221,15 @@ onMounted(() => {
 .nav-item.active img {
   filter: brightness(0) invert(1);
   opacity: 1;
+}
+
+.nav-item.logout-btn {
+  color: #e11d48;
+  margin-top: 1rem;
+}
+
+.nav-item.logout-btn:hover {
+  background-color: #ffe4e6;
 }
 
 .settings-content {
@@ -295,5 +319,38 @@ onMounted(() => {
   margin-top: 2rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--border);
+}
+
+@media (max-width: 768px) {
+  .settings-layout {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .settings-nav {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .nav-item {
+    flex: 1 1 45%;
+    justify-content: center;
+  }
+  .nav-item.logout-btn {
+    margin-top: 0;
+  }
+  .settings-content {
+    padding: 1.5rem;
+  }
+  .profile-pic-edit {
+    flex-direction: column;
+    text-align: center;
+  }
+  .form-actions {
+    flex-direction: column;
+  }
+  .form-actions .btn {
+    width: 100%;
+    text-align: center;
+  }
 }
 </style>

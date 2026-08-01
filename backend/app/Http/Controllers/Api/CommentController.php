@@ -6,12 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Comment\CreateCommentRequest;
 use App\DTOs\Comment\CreateCommentDTO;
 use App\Services\CommentService;
+use App\Services\NotificationService;
 use App\Models\Comment;
 use Illuminate\Http\JsonResponse;
 
 class CommentController extends Controller
 {
-    public function __construct(private CommentService $commentService) {}
+    public function __construct(
+        private CommentService $commentService,
+        private NotificationService $notificationService
+    ) {}
 
     public function store(CreateCommentRequest $request, string $postId): JsonResponse
     {
@@ -21,6 +25,10 @@ class CommentController extends Controller
             $request->text
         );
         $comment = $this->commentService->createComment($dto);
+        
+        $this->notificationService->createCommentNotification($comment->post, auth()->guard('api')->id(), $request->text);
+        
+        $comment->load('user');
         return response()->json(['message' => 'Comment added successfully', 'comment' => $comment], 201);
     }
 

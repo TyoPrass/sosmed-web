@@ -8,7 +8,7 @@
       <p>No posts yet. Be the first to post!</p>
     </div>
 
-    <div v-else class="post-card" v-for="post in posts" :key="post._id">
+    <div v-else class="post-card" v-for="post in posts" :key="post._id || post.id">
       <!-- Post Header -->
       <div class="post-header">
         <div class="post-user-info">
@@ -36,11 +36,22 @@
       <!-- Post Actions -->
       <div class="post-actions">
         <div class="actions-left">
-          <!-- TODO: SVG fallback for heart if not in icon folder -->
           <button class="btn-icon action-btn" @click="toggleLike(post)">
-            <img src="../assets/icon/notification.png" alt="Like" :style="{ filter: post.is_liked ? 'invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%)' : 'none' }" />
+            <svg 
+              viewBox="0 0 24 24" 
+              width="24" 
+              height="24" 
+              :fill="post.is_liked ? '#ed4956' : 'none'" 
+              :stroke="post.is_liked ? '#ed4956' : '#000'" 
+              stroke-width="2" 
+              stroke-linecap="round" 
+              stroke-linejoin="round"
+              :style="{ transform: post.is_liked ? 'scale(1.1)' : 'scale(1)', transition: 'transform 0.15s ease-in-out' }"
+            >
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+            </svg>
           </button>
-          <button class="btn-icon action-btn">
+          <button class="btn-icon action-btn" @click="toggleCommentInput(post)">
             <img src="../assets/icon/comment.png" alt="Comment" />
           </button>
           <button class="btn-icon action-btn">
@@ -48,8 +59,20 @@
           </button>
         </div>
         <div class="actions-right">
-          <button class="btn-icon action-btn">
-            <img src="../assets/icon/save.png" alt="Save" />
+          <button class="btn-icon action-btn" @click="toggleSave(post)">
+            <svg 
+              viewBox="0 0 24 24" 
+              width="24" 
+              height="24" 
+              :fill="post.is_saved ? '#000' : 'none'" 
+              stroke="#000" 
+              stroke-width="2" 
+              stroke-linecap="round" 
+              stroke-linejoin="round"
+              :style="{ transform: post.is_saved ? 'scale(1.1)' : 'scale(1)', transition: 'transform 0.15s ease-in-out' }"
+            >
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+            </svg>
           </button>
         </div>
       </div>
@@ -62,24 +85,36 @@
           {{ post.caption }}
         </div>
         
-        <div class="post-comments-link" v-if="(post.comments_count || 0) > 0">
+        <div class="post-comments-link" v-if="(post.comments_count || 0) > 0" @click="openModal(post)" style="cursor: pointer;">
           View all {{ post.comments_count }} comments
         </div>
-        
-        <div class="post-add-comment">
+        <div class="post-add-comment" @click="openModal(post)" style="cursor: pointer;">
           <div class="comment-avatar">
              <span style="font-size: 10px;">Me</span>
           </div>
-          <input type="text" v-model="post.new_comment" @keyup.enter="submitComment(post)" placeholder="Add a comment..." class="comment-input" />
+          <div style="color: var(--text-light); font-size: 0.9rem; padding-left: 0.5rem;">Add a comment...</div>
         </div>
       </div>
     </div>
+
+    <!-- Post Detail Modal -->
+    <PostDetailModal 
+      :isOpen="isModalOpen" 
+      :post="selectedPost" 
+      @close="closeModal" 
+      @toggle-like="toggleLike" 
+      @toggle-save="toggleSave"
+      @add-comment="submitCommentFromModal" 
+      @post-deleted="handlePostDeleted"
+      @post-updated="handlePostUpdated"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import api from '../utils/axios';
+import PostDetailModal from '../components/PostDetailModal.vue';
 
 // Default image incase post image is not present
 import defaultImage from '../assets/images/smile.png';
@@ -88,6 +123,8 @@ const BACKEND_URL = 'http://127.0.0.1:8000';
 
 const posts = ref<any[]>([]);
 const loading = ref(false);
+const isModalOpen = ref(false);
+const selectedPost = ref<any>(null);
 
 const getImageUrl = (imagePath: string | null) => {
   if (!imagePath) return defaultImage;
@@ -116,7 +153,8 @@ const toggleLike = async (post: any) => {
   post.is_liked = !post.is_liked;
   post.likes_count = (post.likes_count || 0) + (post.is_liked ? 1 : -1);
   try {
-    await api.post(`/posts/${post._id}/like`);
+    const postId = post._id || post.id;
+    await api.post(`/posts/${postId}/like`);
   } catch (e) {
     // revert on failure
     post.is_liked = !post.is_liked;
@@ -124,18 +162,72 @@ const toggleLike = async (post: any) => {
   }
 };
 
+const toggleSave = async (post: any) => {
+  post.is_saved = !post.is_saved;
+  try {
+    const postId = post._id || post.id;
+    await api.post(`/posts/${postId}/save`);
+  } catch (e) {
+    // revert on failure
+    post.is_saved = !post.is_saved;
+  }
+};
+
+const openModal = (post: any) => {
+  selectedPost.value = post;
+  isModalOpen.value = true;
+};
+
+const closeModal = () => {
+  isModalOpen.value = false;
+  setTimeout(() => {
+    selectedPost.value = null;
+  }, 200);
+};
+
+const handlePostDeleted = (postId: string) => {
+  posts.value = posts.value.filter(p => p._id !== postId && p.id !== postId);
+};
+
+const handlePostUpdated = (updatedPost: any) => {
+  const postId = updatedPost._id || updatedPost.id;
+  const index = posts.value.findIndex(p => p._id === postId || p.id === postId);
+  if (index !== -1) {
+    posts.value[index] = updatedPost;
+  }
+};
+
+const toggleCommentInput = (post: any) => {
+  openModal(post);
+};
+
 const submitComment = async (post: any) => {
   if (!post.new_comment || post.new_comment.trim() === '') return;
-  
-  const text = post.new_comment.trim();
+  await submitCommentFromModal(post, post.new_comment);
+};
+
+const submitCommentFromModal = async (post: any, text: string) => {
   post.new_comment = '';
   post.comments_count = (post.comments_count || 0) + 1;
   
+  if (!post.comments) post.comments = [];
+  const tempId = 'temp-' + Date.now();
+  post.comments.push({
+    _id: tempId,
+    text: text,
+    user: { username: 'Sending...' }
+  });
+  
   try {
-    await api.post(`/posts/${post._id}/comments`, { text });
+    const postId = post._id || post.id;
+    const response = await api.post(`/posts/${postId}/comments`, { text });
+    const index = post.comments.findIndex((c: any) => c._id === tempId || c.id === tempId);
+    if (index !== -1) {
+      post.comments[index] = response.data.comment;
+    }
   } catch (e) {
     post.comments_count = (post.comments_count || 0) - 1;
-    post.new_comment = text;
+    post.comments = post.comments.filter((c: any) => c._id !== tempId && c.id !== tempId);
   }
 };
 
@@ -158,3 +250,4 @@ onUnmounted(() => {
   window.removeEventListener('post-created', fetchPosts);
 });
 </script>
+

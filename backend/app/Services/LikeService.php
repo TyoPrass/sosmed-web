@@ -7,13 +7,17 @@ use App\Models\Post;
 
 class LikeService
 {
+    public function __construct(private NotificationService $notificationService) {}
+
     public function toggleLike(string $userId, string $postId): array
     {
         $like = Like::where('user_id', $userId)->where('post_id', $postId)->first();
+        $post = Post::findOrFail($postId);
 
         if ($like) {
             $like->delete();
-            Post::where('_id', $postId)->decrement('likes_count');
+            $post->decrement('likes_count');
+            $this->notificationService->deleteLikeNotification($post, $userId);
             return ['status' => 'unliked'];
         }
 
@@ -21,7 +25,9 @@ class LikeService
             'user_id' => $userId,
             'post_id' => $postId,
         ]);
-        Post::where('_id', $postId)->increment('likes_count');
+        $post->increment('likes_count');
+        $this->notificationService->createLikeNotification($post, $userId);
+        
         return ['status' => 'liked'];
     }
 }

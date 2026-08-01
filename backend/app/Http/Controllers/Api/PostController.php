@@ -20,6 +20,12 @@ class PostController extends Controller
         return response()->json($posts);
     }
 
+    public function userPosts(string $id): JsonResponse
+    {
+        $posts = $this->postService->getAllPosts($id);
+        return response()->json($posts);
+    }
+
     public function store(CreatePostRequest $request): JsonResponse
     {
         $imagePath = null;
@@ -35,6 +41,18 @@ class PostController extends Controller
         );
         $post = $this->postService->createPost($dto);
         return response()->json(['message' => 'Post created successfully', 'post' => $post], 201);
+    }
+
+    public function update(\Illuminate\Http\Request $request, string $id): JsonResponse
+    {
+        $post = Post::findOrFail($id);
+        if ($post->user_id !== auth()->guard('api')->id()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $request->validate(['caption' => 'required|string']);
+        $post = $this->postService->updatePost($post, $request->caption);
+        return response()->json(['message' => 'Post updated successfully', 'post' => $post]);
     }
 
     public function destroy(string $id): JsonResponse

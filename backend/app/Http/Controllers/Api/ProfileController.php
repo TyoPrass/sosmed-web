@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use App\Models\Follow;
 
 class ProfileController extends Controller
 {
@@ -18,7 +19,10 @@ class ProfileController extends Controller
 
     public function show(): JsonResponse
     {
-        return response()->json(auth()->guard('api')->user());
+        $user = auth()->guard('api')->user();
+        $user->followers_count = Follow::where('following_id', $user->id)->count();
+        $user->following_count = Follow::where('follower_id', $user->id)->count();
+        return response()->json($user);
     }
 
     public function update(UpdateProfileRequest $request): JsonResponse
@@ -53,6 +57,31 @@ class ProfileController extends Controller
     public function showUser(string $id): JsonResponse
     {
         $user = User::findOrFail($id);
+        $user->followers_count = Follow::where('following_id', $user->_id)->count();
+        $user->following_count = Follow::where('follower_id', $user->_id)->count();
+        
+        $currentUserId = auth()->guard('api')->id();
+        $user->is_following = false;
+        if ($currentUserId) {
+            $user->is_following = Follow::where('follower_id', $currentUserId)
+                                        ->where('following_id', $user->_id)
+                                        ->exists();
+        }
+
         return response()->json($user);
+    }
+
+    public function search(\Illuminate\Http\Request $request): JsonResponse
+    {
+        $query = $request->query('q');
+        if (!$query) {
+            return response()->json([]);
+        }
+
+        $users = User::where('username', 'like', '%' . $query . '%')
+                     ->take(10)
+                     ->get(['_id', 'username', 'avatar_path']);
+
+        return response()->json($users);
     }
 }
